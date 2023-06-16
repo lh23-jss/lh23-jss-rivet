@@ -1,0 +1,19 @@
+Name: JET_NTUPLE_QG
+Summary: A demo to show how to write a simple ROOT ntuple from Rivet
+Status: EXAMPLE
+Authors:
+ - Huilin Qu <huilin.qu@cern.ch>
+Description:
+  "This analysis applies the Z+jet and dijet selection as in CMS_2021_I1920187, 
+  and stores the selected jet and its constituents in a ROOT file. To build it:
+  rivet-build RivetExampleAnalyses.so JET_NTUPLE_QG.cc `root-config --cflags --libs`
+  "
+Options:
+ - ROOTFILE=*
+ - MODE=DIJET,ZJET
+ - JET_R=*
+ - JET_MIN_PT=*
+ - JET_MAX_PT=*
+ - JET_MIN_ABSETA=*
+ - JET_MAX_ABSETA=*
+
