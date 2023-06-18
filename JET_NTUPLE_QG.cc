@@ -35,6 +35,8 @@ namespace Rivet {
         _mode = 1;
       else if (getOption("MODE") == "ZJET")
         _mode = 2;
+      else if (getOption("MODE") == "WZ")
+        _mode = 3;
       else {
         MSG_WARNING("Mode not specified in JET_NTUPLE_QG, using DIJET");
         _mode = 1;
@@ -81,7 +83,7 @@ namespace Rivet {
         FastJets jetfs(jet_input, FastJets::ANTIKT, _jetRadius);
         declare(jetfs, "Jets");
       }
-      // dijet
+      // dijet, or W(->qq)Z(->vv)
       else {
         // Particles for the jets
         VetoedFinalState jet_input(fs);
@@ -98,6 +100,7 @@ namespace Rivet {
 
       // define branches
       _floatVars["sample"] = 0;
+      _floatVars["jet_R"] = 0;
       _floatVars["jet_idx_by_rap"] = 0;
       _floatVars["jet_pt"] = 0;
       _floatVars["jet_eta"] = 0;
@@ -177,7 +180,7 @@ namespace Rivet {
         selectedJets.push_back(jet1);
       }
       // di jet
-      else {
+      else if (_mode == 1) {
         bool passDijet = false;
         if (jets.size() < 2)
           return;
@@ -211,6 +214,28 @@ namespace Rivet {
           selectedJets.push_back(jet);
         }
       }
+      // W(->qq)Z(->vv)
+      else if (_mode == 1) {
+        // select the leading jet in pT as the W->qq candidate
+        if (jets.empty())
+          return;
+        const auto &jet1 = jets.front();
+
+        bool passWZ = (fabs(jet1.rapidity()) < 1.7);
+        if (!passWZ)
+          return;
+
+        // apply jet selection and store it
+        if (jet1.pt() < _jetMinPt)
+          return;
+        if (jet1.pt() > _jetMaxPt)
+          return;
+        if (jet1.abseta() < _jetMinAbsEta)
+          return;
+        if (jet1.abseta() > _jetMaxAbsEta)
+          return;
+        selectedJets.push_back(jet1);
+      }
 
       // save jet constituents
       for (unsigned idx = 0; idx < selectedJets.size(); ++idx) {
@@ -225,6 +250,7 @@ namespace Rivet {
         }
 
         _floatVars["sample"] = _mode;
+        _floatVars["jet_R"] = _jetRadius;
         _floatVars["jet_idx_by_rap"] = idx;
         _floatVars["jet_pt"] = jet.pt();
         _floatVars["jet_eta"] = jet.eta();
