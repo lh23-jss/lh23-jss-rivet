@@ -30,18 +30,20 @@ namespace Rivet {
     /// Constructor
     JET_NTUPLE_QG() : Analysis("JET_NTUPLE_QG") {}
 
+    enum MODE { NONE, DIJET, ZJET, WZ };
+
     /// Book histograms and initialise projections before the run
     void init() {
-      _mode = 0;
+      _mode = NONE;
       if (getOption("MODE") == "DIJET")
-        _mode = 1;
+        _mode = DIJET;
       else if (getOption("MODE") == "ZJET")
-        _mode = 2;
+        _mode = ZJET;
       else if (getOption("MODE") == "WZ")
-        _mode = 3;
+        _mode = WZ;
       else {
         MSG_WARNING("Mode not specified in JET_NTUPLE_QG, using DIJET");
-        _mode = 1;
+        _mode = NONE;
       }
 
       _compute_angularity = getOption("COMPUTE_ANGULARITY", true);
@@ -55,7 +57,7 @@ namespace Rivet {
       // Initialise and register projections
       FinalState fs(Cuts::abseta < 5 && Cuts::pT > 0 * GeV);
       // Z-jet
-      if (_mode == 2) {
+      if (_mode == ZJET) {
         // for the muons
         double mu_pt = 26.;
         double mz_min = (90 - 20);
@@ -164,7 +166,7 @@ namespace Rivet {
       JetDefinition jet_def(antikt_algorithm, _jetRadius);
 
       // z jet
-      if (_mode == 2) {
+      if (_mode == ZJET) {
         const FinalState &muons = apply<IdentifiedFinalState>(event, "MUONS_NOCUT");
         if (muons.size() >= 2) {
           Particle muon1 = muons.particlesByPt()[0];
@@ -205,7 +207,7 @@ namespace Rivet {
         selectedJets.push_back(jet1);
       }
       // di jet
-      else if (_mode == 1) {
+      else if (_mode == DIJET) {
         bool passDijet = false;
         if (jets.size() < 2)
           return;
@@ -240,7 +242,7 @@ namespace Rivet {
         }
       }
       // W(->qq)Z(->vv)
-      else if (_mode == 1) {
+      else if (_mode == WZ) {
         // select the leading jet in pT as the W->qq candidate
         if (jets.empty())
           return;
@@ -277,7 +279,7 @@ namespace Rivet {
           v.second.clear();
         }
 
-        _floatVars["sample"] = _mode;
+        _floatVars["sample"] = int(_mode);
         _floatVars["jet_R"] = _jetRadius;
         _floatVars["jet_idx_by_rap"] = idx;
         _floatVars["jet_pt"] = jet.pt();
@@ -428,7 +430,7 @@ namespace Rivet {
     };
 
     // mode for the analysis
-    unsigned int _mode;
+    MODE _mode;
     bool _compute_angularity;
 
     // jet radius
