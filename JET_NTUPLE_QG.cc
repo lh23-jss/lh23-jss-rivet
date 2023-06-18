@@ -14,6 +14,8 @@
 #include "fastjet/tools/Recluster.hh"
 #include "fastjet/contrib/SoftDrop.hh"
 
+#include "Rivet/Projections/FinalPartons.hh"
+
 #include <algorithm>
 
 using namespace fastjet;
@@ -107,7 +109,8 @@ namespace Rivet {
       _floatVars["jet_phi"] = 0;
       _floatVars["jet_energy"] = 0;
       _floatVars["jet_nparticles"] = 0;
-
+      _floatVars["jet_parton_id"] = 999;
+      
       if (_compute_angularity) {
         for (const auto &v : _lambdaVars) {
           _floatVars[v.name + "_ungroomed"] = 0;
@@ -129,6 +132,28 @@ namespace Rivet {
       for (auto &v : _arrayVars) {
         _tt->Branch(v.first.c_str(), &v.second, /*bufsize=*/1024000);
       }
+
+      FinalPartons finalPartons_;
+      declare(finalPartons_, "finalPartons"); 
+    }
+    
+    // match partons to jets                                                                                                                   
+    int getPartonFlavour(Jet jet_, FinalPartons fps_, float drmax_) {
+
+      int   fp_pid     = 999;
+      float fp_pt_max_ = 0.;
+      for (const auto& fp_ : fps_.particles()) {
+
+        float dr_ = Rivet::deltaR(jet_.eta(), jet_.phi(), fp_.eta(), fp_.phi());
+        if (dr_ > drmax_) { continue; }
+
+        if (fp_.pt()>fp_pt_max_) {
+          fp_pt_max_ = fp_.pt();
+          fp_pid     = fp_.pid();
+        }
+      }
+
+      return fp_pid;
     }
 
     /// Perform the per-event analysis
@@ -241,6 +266,9 @@ namespace Rivet {
       for (unsigned idx = 0; idx < selectedJets.size(); ++idx) {
         const auto &jet = selectedJets[idx];
 
+        const FinalPartons& finalPartons = apply<FinalPartons>(event, "finalPartons");
+        int jet_parton_id_ = getPartonFlavour(jet, finalPartons, _jetRadius-0.1);
+        
         // reset the variable store
         for (auto &v : _floatVars) {
           v.second = 0;
@@ -257,6 +285,7 @@ namespace Rivet {
         _floatVars["jet_phi"] = jet.phi();
         _floatVars["jet_energy"] = jet.energy();
         _floatVars["jet_nparticles"] = jet.constituents().size();
+        _floatVars["jet_parton_id"] = jet_parton_id_;
 
         for (const auto &p : jet.constituents()) {
           _arrayVars["part_px"].push_back(p.px());
