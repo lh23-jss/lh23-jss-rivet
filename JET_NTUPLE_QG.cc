@@ -40,6 +40,8 @@ namespace Rivet {
         _mode = 1;
       }
 
+      _compute_angularity = getOption("COMPUTE_ANGULARITY", true);
+
       _jetRadius = getOption("JET_R", 0.4);
       _jetMinPt = getOption("JET_MIN_PT", 50);
       _jetMaxPt = getOption("JET_MAX_PT", 1e9);
@@ -96,15 +98,18 @@ namespace Rivet {
 
       // define branches
       _floatVars["sample"] = 0;
+      _floatVars["jet_idx_by_rap"] = 0;
       _floatVars["jet_pt"] = 0;
       _floatVars["jet_eta"] = 0;
       _floatVars["jet_phi"] = 0;
       _floatVars["jet_energy"] = 0;
       _floatVars["jet_nparticles"] = 0;
 
-      for (const auto &v : _lambdaVars) {
-        _floatVars[v.name + "_ungroomed"] = 0;
-        _floatVars[v.name + "_groomed"] = 0;
+      if (_compute_angularity) {
+        for (const auto &v : _lambdaVars) {
+          _floatVars[v.name + "_ungroomed"] = 0;
+          _floatVars[v.name + "_groomed"] = 0;
+        }
       }
 
       _arrayVars["part_px"];
@@ -125,14 +130,6 @@ namespace Rivet {
 
     /// Perform the per-event analysis
     void analyze(const Event &event) {
-      // reset the variable store
-      for (auto &v : _floatVars) {
-        v.second = 0;
-      }
-      for (auto &v : _arrayVars) {
-        v.second.clear();
-      }
-
       apply<VetoedFinalState>(event, "JET_INPUT");
       Jets jets = apply<FastJets>(event, "Jets").jetsByPt(Cuts::pT > 15 * GeV);
       Jets selectedJets;
@@ -201,86 +198,97 @@ namespace Rivet {
           return fabs(A.rapidity()) < fabs(B.rapidity());
         });
 
-        const auto &centralJet = dijets[0];
-
-        // apply jet selection and store it
-        if (centralJet.pt() < _jetMinPt)
-          return;
-        if (centralJet.pt() > _jetMaxPt)
-          return;
-        if (centralJet.abseta() < _jetMinAbsEta)
-          return;
-        if (centralJet.abseta() > _jetMaxAbsEta)
-          return;
-        selectedJets.push_back(centralJet);
+        for (const auto &jet : dijets) {
+          // apply jet selection and store it
+          if (jet.pt() < _jetMinPt)
+            continue;
+          if (jet.pt() > _jetMaxPt)
+            continue;
+          if (jet.abseta() < _jetMinAbsEta)
+            continue;
+          if (jet.abseta() > _jetMaxAbsEta)
+            continue;
+          selectedJets.push_back(jet);
+        }
       }
 
       // save jet constituents
-      if (selectedJets.empty())
-        return;
-      const auto &jet = selectedJets.front();
+      for (unsigned idx = 0; idx < selectedJets.size(); ++idx) {
+        const auto &jet = selectedJets[idx];
 
-      _floatVars["sample"] = _mode;
-      _floatVars["jet_pt"] = jet.pt();
-      _floatVars["jet_eta"] = jet.eta();
-      _floatVars["jet_phi"] = jet.phi();
-      _floatVars["jet_energy"] = jet.energy();
-      _floatVars["jet_nparticles"] = jet.constituents().size();
-
-      // UNGROOMED VERSION
-      // -------------------------------------------------------------------
-      Particles chargedParticles;
-      for (const auto &p : jet.constituents()) {
-        if (p.charge() != 0) {
-          chargedParticles.push_back(p);
+        // reset the variable store
+        for (auto &v : _floatVars) {
+          v.second = 0;
         }
+        for (auto &v : _arrayVars) {
+          v.second.clear();
+        }
+
+        _floatVars["sample"] = _mode;
+        _floatVars["jet_idx_by_rap"] = idx;
+        _floatVars["jet_pt"] = jet.pt();
+        _floatVars["jet_eta"] = jet.eta();
+        _floatVars["jet_phi"] = jet.phi();
+        _floatVars["jet_energy"] = jet.energy();
+        _floatVars["jet_nparticles"] = jet.constituents().size();
+
+        for (const auto &p : jet.constituents()) {
+          _arrayVars["part_px"].push_back(p.px());
+          _arrayVars["part_py"].push_back(p.py());
+          _arrayVars["part_pz"].push_back(p.pz());
+          _arrayVars["part_energy"].push_back(p.energy());
+          _arrayVars["part_charge"].push_back(p.charge());
+          _arrayVars["part_pid"].push_back(p.pid());
+        }
+
+        if (_compute_angularity) {
+          // UNGROOMED VERSION
+          // -------------------------------------------------------------------
+          Particles chargedParticles;
+          for (const auto &p : jet.constituents()) {
+            if (p.charge() != 0) {
+              chargedParticles.push_back(p);
+            }
+          }
+          vector<PseudoJet> chargedJets = jet_def(chargedParticles);
+
+          // Fill hists for each lambda variable
+          for (uint lambdaInd = 0; lambdaInd < _lambdaVars.size(); lambdaInd++) {
+            const LambdaVar &thisLambdaVar = _lambdaVars[lambdaInd];
+            Angularity angularity(thisLambdaVar.beta, _jetRadius, thisLambdaVar.kappa, thisLambdaVar.constitCut);
+            float val = -1;
+            if (thisLambdaVar.isCharged)
+              val = (chargedJets.size() > 0) ? angularity(chargedJets[0]) : -1;
+            else
+              val = angularity(jet);
+            _floatVars[thisLambdaVar.name + "_ungroomed"] = val;
+          }
+
+          // GROOMED VERSION
+          // -------------------------------------------------------------------
+          // Get groomed jet
+          fastjet::contrib::SoftDrop sd(0, 0.1, _jetRadius);
+          PseudoJet groomedJet = sd(jet);
+          PseudoJet groomedJetCharged;
+          if (chargedJets.size() > 0)
+            groomedJetCharged = sd(chargedJets[0]);
+
+          // Fill hists for each lambda variable
+          for (uint lambdaInd = 0; lambdaInd < _lambdaVars.size(); lambdaInd++) {
+            const LambdaVar &thisLambdaVar = _lambdaVars[lambdaInd];
+            Angularity angularity(thisLambdaVar.beta, _jetRadius, thisLambdaVar.kappa, thisLambdaVar.constitCut);
+            float val = -1;
+            if (thisLambdaVar.isCharged)
+              val = (chargedJets.size() > 0) ? angularity(groomedJetCharged) : -1;
+            else
+              val = angularity(groomedJet);
+            _floatVars[thisLambdaVar.name + "_groomed"] = val;
+          }
+        }
+
+        // fill the tree
+        _tt->Fill();
       }
-      vector<PseudoJet> chargedJets = jet_def(chargedParticles);
-
-      // Fill hists for each lambda variable
-      for (uint lambdaInd = 0; lambdaInd < _lambdaVars.size(); lambdaInd++) {
-        const LambdaVar &thisLambdaVar = _lambdaVars[lambdaInd];
-        Angularity angularity(thisLambdaVar.beta, _jetRadius, thisLambdaVar.kappa, thisLambdaVar.constitCut);
-        float val = -1;
-        if (thisLambdaVar.isCharged)
-          val = (chargedJets.size() > 0) ? angularity(chargedJets[0]) : -1;
-        else
-          val = angularity(jet);
-        _floatVars[thisLambdaVar.name + "_ungroomed"] = val;
-      }
-
-      // GROOMED VERSION
-      // -------------------------------------------------------------------
-      // Get groomed jet
-      fastjet::contrib::SoftDrop sd(0, 0.1, _jetRadius);
-      PseudoJet groomedJet = sd(jet);
-      PseudoJet groomedJetCharged;
-      if (chargedJets.size() > 0)
-        groomedJetCharged = sd(chargedJets[0]);
-
-      // Fill hists for each lambda variable
-      for (uint lambdaInd = 0; lambdaInd < _lambdaVars.size(); lambdaInd++) {
-        const LambdaVar &thisLambdaVar = _lambdaVars[lambdaInd];
-        Angularity angularity(thisLambdaVar.beta, _jetRadius, thisLambdaVar.kappa, thisLambdaVar.constitCut);
-        float val = -1;
-        if (thisLambdaVar.isCharged)
-          val = (chargedJets.size() > 0) ? angularity(groomedJetCharged) : -1;
-        else
-          val = angularity(groomedJet);
-        _floatVars[thisLambdaVar.name + "_groomed"] = val;
-      }
-
-      for (const auto &p : jet.constituents()) {
-        _arrayVars["part_px"].push_back(p.px());
-        _arrayVars["part_py"].push_back(p.py());
-        _arrayVars["part_pz"].push_back(p.pz());
-        _arrayVars["part_energy"].push_back(p.energy());
-        _arrayVars["part_charge"].push_back(p.charge());
-        _arrayVars["part_pid"].push_back(p.pid());
-      }
-
-      // fill the tree
-      _tt->Fill();
 
     }  // end analyze() function
 
@@ -366,6 +374,7 @@ namespace Rivet {
 
     // mode for the analysis
     unsigned int _mode;
+    bool _compute_angularity;
 
     // jet radius
     float _jetRadius;
