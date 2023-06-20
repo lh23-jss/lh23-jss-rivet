@@ -6,6 +6,7 @@ selection:
 new_variables:
   ### [format] name: formula
   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+  idx: _hash(jet_pt, jet_eta, jet_phi)
   part_mask: ak.ones_like(part_px)
   part_pt: np.hypot(part_px, part_py)
   part_pt_log: np.log(part_pt)

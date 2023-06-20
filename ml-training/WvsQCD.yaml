@@ -6,6 +6,7 @@ selection:
 new_variables:
   ### [format] name: formula
   ### can use functions from `math`, `np` (numpy), and `awkward` in the expression
+  idx: _hash(jet_pt, jet_eta, jet_phi)
   part_mask: ak.ones_like(part_px)
   part_pt: np.hypot(part_px, part_py)
   part_pt_log: np.log(part_pt)
@@ -28,13 +29,13 @@ preprocess:
 
 inputs:
   pf_points:
-    length: 200
+    length: 128
     pad_mode: wrap
     vars:
       - [part_deta, null]
       - [part_dphi, null]
   pf_features:
-    length: 200
+    length: 128
     pad_mode: wrap
     vars:
       ### [format 1]: var_name (no transformation)
@@ -52,7 +53,7 @@ inputs:
       - [part_deta, null]
       - [part_dphi, null]
   pf_vectors:
-    length: 200
+    length: 128
     pad_mode: wrap
     vars:
       - [part_px, null]
@@ -60,7 +61,7 @@ inputs:
       - [part_pz, null]
       - [part_energy, null]
   pf_mask:
-    length: 200
+    length: 128
     pad_mode: constant
     vars:
       - [part_mask, null]
