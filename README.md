@@ -31,13 +31,13 @@ rivet 0000.hepmc -a JET_NTUPLE_QG:MODE=ZJET:JET_R=0.4:ROOTFILE=ZJET.root
 rivet 0000.hepmc -a JET_NTUPLE_QG:MODE=DIJET:JET_R=0.4:ROOTFILE=DIJET.root
 ```
 
-### W(->qq)Z(->vv) (pT > 500 GeV)
+### W(->qq)Z(->vv) (pT > 600 GeV)
 
 ```bash
 rivet 0000.hepmc -a JET_NTUPLE_QG:MODE=WZ:JET_R=0.8:JET_MIN_PT=600:ROOTFILE=WZ.root
 ```
 
-### Dijet (pT > 500 GeV)
+### Dijet (pT > 600 GeV)
 
 ```bash
 rivet 0000.hepmc -a JET_NTUPLE_QG:MODE=DIJET:JET_R=0.8:JET_MIN_PT=600:ROOTFILE=DIJET_HPT.root
