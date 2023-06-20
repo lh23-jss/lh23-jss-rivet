@@ -112,7 +112,7 @@ namespace Rivet {
       _floatVars["jet_energy"] = 0;
       _floatVars["jet_nparticles"] = 0;
       _floatVars["jet_parton_id"] = 999;
-      
+
       if (_compute_angularity) {
         for (const auto &v : _lambdaVars) {
           _floatVars[v.name + "_ungroomed"] = 0;
@@ -136,22 +136,22 @@ namespace Rivet {
       }
 
       FinalPartons finalPartons_;
-      declare(finalPartons_, "finalPartons"); 
+      declare(finalPartons_, "finalPartons");
     }
-    
-    // match partons to jets                                                                                                                   
+
+    // match partons to jets
     int getPartonFlavour(Jet jet_, FinalPartons fps_, float drmax_) {
-
-      int   fp_pid     = 999;
+      int fp_pid = 999;
       float fp_pt_max_ = 0.;
-      for (const auto& fp_ : fps_.particles()) {
-
+      for (const auto &fp_ : fps_.particles()) {
         float dr_ = Rivet::deltaR(jet_.eta(), jet_.phi(), fp_.eta(), fp_.phi());
-        if (dr_ > drmax_) { continue; }
+        if (dr_ > drmax_) {
+          continue;
+        }
 
-        if (fp_.pt()>fp_pt_max_) {
+        if (fp_.pt() > fp_pt_max_) {
           fp_pt_max_ = fp_.pt();
-          fp_pid     = fp_.pid();
+          fp_pid = fp_.pid();
         }
       }
 
@@ -268,9 +268,9 @@ namespace Rivet {
       for (unsigned idx = 0; idx < selectedJets.size(); ++idx) {
         const auto &jet = selectedJets[idx];
 
-        const FinalPartons& finalPartons = apply<FinalPartons>(event, "finalPartons");
-        int jet_parton_id_ = getPartonFlavour(jet, finalPartons, _jetRadius-0.1);
-        
+        const FinalPartons &finalPartons = apply<FinalPartons>(event, "finalPartons");
+        int jet_parton_id_ = getPartonFlavour(jet, finalPartons, _jetRadius - 0.1);
+
         // reset the variable store
         for (auto &v : _floatVars) {
           v.second = 0;
@@ -289,7 +289,8 @@ namespace Rivet {
         _floatVars["jet_nparticles"] = jet.constituents().size();
         _floatVars["jet_parton_id"] = jet_parton_id_;
 
-        for (const auto &p : jet.constituents()) {
+        // NOTE: need to sort jet constituents by pT
+        for (const auto &p : sortByPt(jet.constituents())) {
           _arrayVars["part_px"].push_back(p.px());
           _arrayVars["part_py"].push_back(p.py());
           _arrayVars["part_pz"].push_back(p.pz());
